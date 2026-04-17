@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Rscript -e \"devtools::load_all\\(\\); cat\\('load_all OK\\\\n'\\)\")",
+      "Bash(Rscript -e \"devtools::test\\(\\)\")",
+      "Bash(Rscript -e ':*)",
+      "Bash(Rscript -e \"devtools::document\\(\\)\")",
+      "Bash(Rscript -e \"devtools::check\\(quiet = TRUE\\)\")",
+      "Bash(Rscript -e \"devtools::document\\(quiet = TRUE\\)\")",
+      "Bash(Rscript -e \"devtools::document\\(quiet = TRUE\\) ; devtools::test\\(\\)\")"
+    ]
+  }
+}
