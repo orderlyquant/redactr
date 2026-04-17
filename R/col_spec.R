@@ -2,8 +2,10 @@
 #
 # col_types in redact() / redact_vec() accepts either a plain string
 # ("code", "group", "name", "numeric", "skip") or a col_*() object for
-# cases where extra options are needed (e.g. col_group(bank = "animals")).
+# cases where extra options are needed (e.g. col_group(bank = "animals"),
+# col_formula(~ alloc + selec)).
 
+# Valid types for plain-string shorthand (formula requires col_formula())
 .valid_types <- c("code", "group", "name", "numeric", "skip")
 
 # ---- Constructors -------------------------------------------------------
@@ -13,21 +15,42 @@
 #' Use these constructors in the `col_types` argument of [redact()] when you
 #' need to pass options beyond the default.  Plain strings `"code"`,
 #' `"group"`, `"name"`, `"numeric"`, and `"skip"` are also accepted as
-#' shorthand.
+#' shorthand for the no-option constructors.
+#'
+#' `col_formula()` is special: it does not anonymize a column independently.
+#' Instead, it recomputes the column from an R expression evaluated against
+#' the already-redacted data.  This lets you preserve arithmetic relationships
+#' between columns — for example, when `tot_attr = alloc + selec`, redacting
+#' `alloc` and `selec` independently and then recomputing `tot_attr` keeps the
+#' column internally consistent.  Formula columns are always evaluated in a
+#' second pass, after all independent redaction types have been applied.
 #'
 #' @param bank For `col_group()`: which thematic word bank to draw
 #'   substitutes from.  One of `"auto"` (pool all banks), `"colors"`,
 #'   `"animals"`, `"tools"`, `"automobiles"`, or `"mascots"`.  See
 #'   [word_bank_names()] for the current list.
+#' @param expr For `col_formula()`: a one-sided R formula whose right-hand
+#'   side is an expression referencing other column names, e.g.
+#'   `~ alloc + selec`.  A plain string such as `"alloc + selec"` is also
+#'   accepted.  The expression is evaluated with the (partially) redacted
+#'   tibble as the data environment, so any base-R or imported function is
+#'   available (e.g. `~ round(alloc + selec, 6)`).
 #'
 #' @return An object of class `redactr_col_spec` (a named list).
 #' @name col_types
 #' @examples
-#' # Plain strings are shorthand for the defaults:
+#' # Plain strings are shorthand for the no-option constructors:
 #' # col_types = list(account_id = "code", sector = "group")
 #'
 #' # Use col_group() to pick a specific word bank:
 #' # col_types = list(sector = col_group(bank = "animals"))
+#'
+#' # Use col_formula() to recompute a derived column after redaction:
+#' # col_types = list(
+#' #   alloc    = "numeric",
+#' #   selec    = "numeric",
+#' #   tot_attr = col_formula(~ alloc + selec)
+#' # )
 NULL
 
 #' @rdname col_types
@@ -63,6 +86,31 @@ col_numeric <- function() {
 #' @export
 col_skip <- function() {
   new_col_spec("skip")
+}
+
+#' @rdname col_types
+#' @export
+col_formula <- function(expr) {
+  if (inherits(expr, "formula")) {
+    if (length(expr) != 2L) {
+      rlang::abort(
+        "`col_formula()` requires a one-sided formula, e.g. `~ alloc + selec`.",
+        call = rlang::caller_env()
+      )
+    }
+    call_expr <- rlang::f_rhs(expr)
+  } else if (is.character(expr) && length(expr) == 1L) {
+    call_expr <- str2lang(expr)
+  } else {
+    rlang::abort(
+      c(
+        "`expr` must be a one-sided formula or a string.",
+        "i" = 'Examples: `col_formula(~ alloc + selec)` or `col_formula("alloc + selec")`.'
+      ),
+      call = rlang::caller_env()
+    )
+  }
+  new_col_spec("formula", expr = call_expr)
 }
 
 new_col_spec <- function(type, ...) {

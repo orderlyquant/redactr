@@ -7,6 +7,7 @@
 \alias{col_name}
 \alias{col_numeric}
 \alias{col_skip}
+\alias{col_formula}
 \title{Column type specifications for redact()}
 \usage{
 col_code()
@@ -18,12 +19,21 @@ col_name()
 col_numeric()
 
 col_skip()
+
+col_formula(expr)
 }
 \arguments{
 \item{bank}{For \code{col_group()}: which thematic word bank to draw
 substitutes from.  One of \code{"auto"} (pool all banks), \code{"colors"},
 \code{"animals"}, \code{"tools"}, \code{"automobiles"}, or \code{"mascots"}.  See
 \code{\link[=word_bank_names]{word_bank_names()}} for the current list.}
+
+\item{expr}{For \code{col_formula()}: a one-sided R formula whose right-hand
+side is an expression referencing other column names, e.g.
+\code{~ alloc + selec}.  A plain string such as \code{"alloc + selec"} is also
+accepted.  The expression is evaluated with the (partially) redacted
+tibble as the data environment, so any base-R or imported function is
+available (e.g. \code{~ round(alloc + selec, 6)}).}
 }
 \value{
 An object of class \code{redactr_col_spec} (a named list).
@@ -32,12 +42,28 @@ An object of class \code{redactr_col_spec} (a named list).
 Use these constructors in the \code{col_types} argument of \code{\link[=redact]{redact()}} when you
 need to pass options beyond the default.  Plain strings \code{"code"},
 \code{"group"}, \code{"name"}, \code{"numeric"}, and \code{"skip"} are also accepted as
-shorthand.
+shorthand for the no-option constructors.
+}
+\details{
+\code{col_formula()} is special: it does not anonymize a column independently.
+Instead, it recomputes the column from an R expression evaluated against
+the already-redacted data.  This lets you preserve arithmetic relationships
+between columns — for example, when \code{tot_attr = alloc + selec}, redacting
+\code{alloc} and \code{selec} independently and then recomputing \code{tot_attr} keeps the
+column internally consistent.  Formula columns are always evaluated in a
+second pass, after all independent redaction types have been applied.
 }
 \examples{
-# Plain strings are shorthand for the defaults:
+# Plain strings are shorthand for the no-option constructors:
 # col_types = list(account_id = "code", sector = "group")
 
 # Use col_group() to pick a specific word bank:
 # col_types = list(sector = col_group(bank = "animals"))
+
+# Use col_formula() to recompute a derived column after redaction:
+# col_types = list(
+#   alloc    = "numeric",
+#   selec    = "numeric",
+#   tot_attr = col_formula(~ alloc + selec)
+# )
 }

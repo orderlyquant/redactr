@@ -15,6 +15,10 @@
 #'   - `"numeric"` / [col_numeric()]: within-column random permutation.
 #'   - `"skip"` / [col_skip()]: leave column unchanged (default for any
 #'     column not mentioned).
+#'   - [col_formula()]: recompute the column from an R expression evaluated
+#'     against the already-redacted data (e.g. `col_formula(~ alloc + selec)`).
+#'     Formula columns are processed after all other types and no mapping is
+#'     stored for them.
 #' @param seed Optional integer seed passed to [set.seed()] for
 #'   reproducibility. Applied once before any column is processed.
 #'
@@ -63,11 +67,12 @@ redact <- function(.data, col_types, seed = NULL) {
   columns  <- character(0L)
   out      <- tibble::as_tibble(.data)
 
+  # First pass: independent redaction types (code, group, name, numeric).
   for (col in names(spec)) {
     type_spec <- spec[[col]]
     type      <- type_spec$type
 
-    if (type == "skip") next
+    if (type %in% c("skip", "formula")) next
 
     col_result <- switch(type,
       code    = redact_code_vec(out[[col]]),
@@ -82,6 +87,15 @@ redact <- function(.data, col_types, seed = NULL) {
     if (!is.null(col_result$mapping)) {
       mapping[[col]] <- col_result$mapping
     }
+  }
+
+  # Second pass: formula columns, evaluated against the redacted data.
+  for (col in names(spec)) {
+    type_spec <- spec[[col]]
+    if (type_spec$type != "formula") next
+
+    out[[col]] <- eval(type_spec$expr, envir = as.list(out))
+    columns    <- c(columns, col)
   }
 
   structure(
