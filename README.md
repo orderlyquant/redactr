@@ -3,7 +3,7 @@
 **Prepare data for LLM projects by anonymizing sensitive information.**
 
 redactr anonymizes vectors and tibbles so that sensitive data can be safely
-shared with large language models. Four redaction strategies are supported,
+shared with large language models. Five redaction strategies are supported,
 each preserving structural characteristics that keep the data useful for
 analysis and prompting.
 
@@ -15,6 +15,7 @@ analysis and prompting.
 | `"group"` | Each unique value mapped to a thematic word | Count of unique values, consistent substitution |
 | `"name"` | Replaced with fake-but-realistic names | Name format (First Last / Last, First / single) |
 | `"numeric"` | Values randomly permuted within the column | Full distribution (min, max, mean, SD) |
+| `col_formula()` | Column recomputed from an R expression | Arithmetic relationship to other columns |
 
 ## Installation
 
@@ -91,6 +92,13 @@ col_types = list(
   sector = col_group(bank = "animals"),  # pick a specific word bank
   region = col_group(bank = "colors")
 )
+
+# col_formula() — recompute a derived column from already-redacted values
+col_types = list(
+  alloc    = "numeric",
+  selec    = "numeric",
+  tot_attr = col_formula(~ alloc + selec)
+)
 ```
 
 Available word banks (see `word_bank_names()`):
@@ -102,6 +110,45 @@ Available word banks (see `word_bank_names()`):
 - `"mascots"` — anchor, arrow, blaze, bolt, …
 
 Use `bank = "auto"` (the default) to pool all banks into one large draw.
+
+## Preserving relationships between columns
+
+When a dataset contains derived columns — e.g. `tot_attr = alloc + selec` in
+attribution data — independently redacting all three columns breaks that
+relationship. Use `col_formula()` to recompute the derived column from the
+already-redacted source columns instead:
+
+```r
+set.seed(1)
+attr_dat <- tibble(
+  sector   = c("Energy", "Energy", "Energy"),
+  alloc    = c( 0.00,  0.00,  0.00),
+  selec    = c(-0.002,  0.010, -0.014),
+  tot_attr = c(-0.014,  0.000,  0.041)   # alloc + selec
+)
+
+result <- redact(
+  attr_dat,
+  col_types = list(
+    sector   = "group",
+    alloc    = "numeric",
+    selec    = "numeric",
+    tot_attr = col_formula(~ alloc + selec)
+  )
+)
+
+result$data
+# tot_attr equals alloc + selec in the redacted output
+```
+
+**Execution order:** `col_formula()` columns are always evaluated in a second
+pass, after all `"code"`, `"group"`, `"name"`, and `"numeric"` columns have
+been processed. This means a formula that references a `"numeric"` column sees
+the *shuffled* values, not the originals.
+
+**No mapping stored:** formula columns appear in `result$columns` but not in
+`result$mapping`. Because they are derived rather than independently
+anonymized, there is nothing to store or re-apply with `apply_redact()`.
 
 ## Single-vector redaction
 
@@ -157,9 +204,10 @@ result <- redact(dat, col_types = list(sector = "group"), seed = 123)
   `readr::read_csv(col_types = ...)`. This avoids silent misclassification.
 - **Columns keep their original names.** Redacted values replace originals
   in-place. Assign `result$data` to a new name to keep both copies.
-- **Mappings stored for everything except numeric.** Code, group, and name
-  mappings are deterministic look-ups, making cross-file consistency trivial.
-  Numeric permutations are one-way by design.
+- **Mappings stored for code, group, and name only.** These are deterministic
+  look-ups, making cross-file consistency trivial via `apply_redact()`.
+  Numeric permutations are one-way by design; formula columns are derived and
+  have no independent mapping to store.
 - **Format-preserving codes.** `"ACC-1234"` becomes something like
   `"KPQ-7829"` — same structure, different values, same readability.
 - **Thematic word banks.** Group substitutes come from curated word lists

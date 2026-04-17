@@ -1,9 +1,9 @@
 #' Redact a tibble
 #'
 #' Anonymizes selected columns in a data frame or tibble. Each target column
-#' is replaced in-place by a redacted version whose name carries the `_rdct`
-#' suffix. A mapping table is stored for every non-numeric column so that the
-#' same substitutions can be applied to related files with [apply_redact()].
+#' is replaced in-place under its original name. A mapping table is stored for
+#' `"code"`, `"group"`, and `"name"` columns so that the same substitutions can
+#' be applied to related files with [apply_redact()].
 #'
 #' @param .data A data frame or tibble.
 #' @param col_types A named list (or named character vector) specifying the
@@ -26,9 +26,14 @@
 #'   - `$data`: a tibble with redacted columns replaced in-place under their
 #'     original names. Assign the result to a new object to preserve the
 #'     original data alongside the redacted copy.
-#'   - `$mapping`: a named list, one entry per redacted non-numeric column,
-#'     each a [tibble::tibble()] with `original` and `redacted` columns.
-#'   - `$columns`: character vector of all column names that were redacted.
+#'   - `$mapping`: a named list with one entry per `"code"`, `"group"`, or
+#'     `"name"` column, each a [tibble::tibble()] with `original` and
+#'     `redacted` columns. `"numeric"` and `col_formula()` columns are not
+#'     present in `$mapping` — numerics because their shuffle is row-specific
+#'     and non-transferable, formula columns because they are derived rather
+#'     than independently anonymized.
+#'   - `$columns`: character vector of all column names that were redacted or
+#'     recomputed (i.e. every column listed in `col_types` except `"skip"`).
 #'
 #' @export
 #' @examples
@@ -52,6 +57,30 @@
 #'
 #' result$data
 #' result$mapping
+#'
+#' # Use col_formula() to keep derived columns consistent with their sources.
+#' # alloc and selec are shuffled independently; tot_attr is then recomputed
+#' # as alloc + selec so the relationship is preserved in the redacted data.
+#' set.seed(1)
+#' attr_dat <- tibble::tibble(
+#'   alloc    = c( 0.10,  0.20, -0.05,  0.15),
+#'   selec    = c( 0.05, -0.03,  0.08,  0.02),
+#'   tot_attr = c( 0.15,  0.17,  0.03,  0.17)
+#' )
+#'
+#' attr_result <- redact(
+#'   attr_dat,
+#'   col_types = list(
+#'     alloc    = "numeric",
+#'     selec    = "numeric",
+#'     tot_attr = col_formula(~ alloc + selec)
+#'   )
+#' )
+#'
+#' attr_result$data
+#' # tot_attr equals alloc + selec in the redacted output
+#' all.equal(attr_result$data$tot_attr,
+#'           attr_result$data$alloc + attr_result$data$selec)
 redact <- function(.data, col_types, seed = NULL) {
   if (!is.data.frame(.data)) {
     rlang::abort(
