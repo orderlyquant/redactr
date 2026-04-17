@@ -34,16 +34,21 @@ An object of class \code{redactr_result} (a list) with elements:
 \item \verb{$data}: a tibble with redacted columns replaced in-place under their
 original names. Assign the result to a new object to preserve the
 original data alongside the redacted copy.
-\item \verb{$mapping}: a named list, one entry per redacted non-numeric column,
-each a \code{\link[tibble:tibble]{tibble::tibble()}} with \code{original} and \code{redacted} columns.
-\item \verb{$columns}: character vector of all column names that were redacted.
+\item \verb{$mapping}: a named list with one entry per \code{"code"}, \code{"group"}, or
+\code{"name"} column, each a \code{\link[tibble:tibble]{tibble::tibble()}} with \code{original} and
+\code{redacted} columns. \code{"numeric"} and \code{col_formula()} columns are not
+present in \verb{$mapping} — numerics because their shuffle is row-specific
+and non-transferable, formula columns because they are derived rather
+than independently anonymized.
+\item \verb{$columns}: character vector of all column names that were redacted or
+recomputed (i.e. every column listed in \code{col_types} except \code{"skip"}).
 }
 }
 \description{
 Anonymizes selected columns in a data frame or tibble. Each target column
-is replaced in-place by a redacted version whose name carries the \verb{_rdct}
-suffix. A mapping table is stored for every non-numeric column so that the
-same substitutions can be applied to related files with \code{\link[=apply_redact]{apply_redact()}}.
+is replaced in-place under its original name. A mapping table is stored for
+\code{"code"}, \code{"group"}, and \code{"name"} columns so that the same substitutions can
+be applied to related files with \code{\link[=apply_redact]{apply_redact()}}.
 }
 \examples{
 set.seed(42)
@@ -66,4 +71,28 @@ result <- redact(
 
 result$data
 result$mapping
+
+# Use col_formula() to keep derived columns consistent with their sources.
+# alloc and selec are shuffled independently; tot_attr is then recomputed
+# as alloc + selec so the relationship is preserved in the redacted data.
+set.seed(1)
+attr_dat <- tibble::tibble(
+  alloc    = c( 0.10,  0.20, -0.05,  0.15),
+  selec    = c( 0.05, -0.03,  0.08,  0.02),
+  tot_attr = c( 0.15,  0.17,  0.03,  0.17)
+)
+
+attr_result <- redact(
+  attr_dat,
+  col_types = list(
+    alloc    = "numeric",
+    selec    = "numeric",
+    tot_attr = col_formula(~ alloc + selec)
+  )
+)
+
+attr_result$data
+# tot_attr equals alloc + selec in the redacted output
+all.equal(attr_result$data$tot_attr,
+          attr_result$data$alloc + attr_result$data$selec)
 }

@@ -39,18 +39,30 @@
 #' @return An object of class `redactr_col_spec` (a named list).
 #' @name col_types
 #' @examples
-#' # Plain strings are shorthand for the no-option constructors:
-#' # col_types = list(account_id = "code", sector = "group")
+#' # Constructors can be used directly or as values in col_types lists.
+#' col_code()
+#' col_group()
+#' col_group(bank = "animals")
+#' col_name()
+#' col_numeric()
+#' col_skip()
+#' col_formula(~ alloc + selec)
+#' col_formula("alloc + selec")   # string form; identical to the above
 #'
-#' # Use col_group() to pick a specific word bank:
-#' # col_types = list(sector = col_group(bank = "animals"))
-#'
-#' # Use col_formula() to recompute a derived column after redaction:
-#' # col_types = list(
-#' #   alloc    = "numeric",
-#' #   selec    = "numeric",
-#' #   tot_attr = col_formula(~ alloc + selec)
-#' # )
+#' # Typical usage inside redact():
+#' \dontrun{
+#' redact(
+#'   dat,
+#'   col_types = list(
+#'     account_id = "code",                        # shorthand string
+#'     sector     = col_group(bank = "animals"),   # specific word bank
+#'     revenue    = "numeric",
+#'     manager    = "name",
+#'     tot_attr   = col_formula(~ alloc + selec),  # derived column
+#'     notes      = "skip"                         # leave unchanged
+#'   )
+#' )
+#' }
 NULL
 
 #' @rdname col_types
