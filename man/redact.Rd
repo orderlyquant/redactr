@@ -19,6 +19,10 @@ names in \code{.data}. Valid types:
 \item \code{"numeric"} / \code{\link[=col_numeric]{col_numeric()}}: within-column random permutation.
 \item \code{"skip"} / \code{\link[=col_skip]{col_skip()}}: leave column unchanged (default for any
 column not mentioned).
+\item \code{\link[=col_formula]{col_formula()}}: recompute the column from an R expression evaluated
+against the already-redacted data (e.g. \code{col_formula(~ alloc + selec)}).
+Formula columns are processed after all other types and no mapping is
+stored for them.
 }}
 
 \item{seed}{Optional integer seed passed to \code{\link[=set.seed]{set.seed()}} for
